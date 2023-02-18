@@ -63,7 +63,7 @@ If you are interested in learning more about the Transformer architecture, I rec
 - [The Illustrated Transformer by Jay Alammar](http://jalammar.github.io/illustrated-transformer/) by Jay Alammar.
 - [Pytorch Transformers from Scratch](https://www.youtube.com/watch?v=U0s0f995w14&t=729s) by Aladdin Persson.
 - [The Annotated Transformer](http://nlp.seas.harvard.edu/annotated-transformer/) by Sasha Rush.
-- [Understanding and Coding the Self-Attention Mechanism of Large Language Models From Scratch] (https://sebastianraschka.com/blog/2023/self-attention-from-scratch.html) by Sebastian Raschka.
+- [Understanding and Coding the Self-Attention Mechanism of Large Language Models From Scratch](https://sebastianraschka.com/blog/2023/self-attention-from-scratch.html) by Sebastian Raschka.
 - [TRANSFORMERS FROM SCRATCH](https://peterbloem.nl/blog/transformers) by Peter Bloem.
 
 
