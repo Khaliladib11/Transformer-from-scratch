@@ -34,12 +34,12 @@ class MultiHeadAttention(nn.Module):
         # reshape from (batch_size x seq_len x embed_size) -> (batch_size x seq_len x heads x head)
         # example: from (32x10x512) -> (32x10x8x64)
         key = key.reshape(batch_size, k_len, self.heads, self.head)
-        query = key.reshape(batch_size, q_len, self.heads, self.head)
-        value = key.reshape(batch_size, v_len, self.heads, self.head)
+        query = query.reshape(batch_size, q_len, self.heads, self.head)
+        value = value.reshape(batch_size, v_len, self.heads, self.head)
 
         key = self.key(key)  # (32x10x8x64)
-        query = self.key(query)  # (32x10x8x64)
-        value = self.key(value)  # (32x10x8x64)
+        query = self.query(query)  # (32x10x8x64)
+        value = self.value(value)  # (32x10x8x64)
 
         ############### query x key ###############
 
