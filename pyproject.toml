@@ -5,3 +5,23 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]  
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--tb=short",
+]
+markers = [
+    "gpu: marks tests that require GPU (CUDA)",
+    "mps: marks tests that require MPS (Apple Silicon GPU)",
+]

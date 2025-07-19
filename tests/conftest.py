@@ -14,8 +14,13 @@ from transformer import Transformer
 
 @pytest.fixture
 def device():
-    """Fixture to get the available device (CUDA if available, else CPU)"""
-    return torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    """Fixture to get the available device (CUDA, MPS if available, else CPU)"""
+    if torch.cuda.is_available():
+        return torch.device('cuda')
+    elif torch.backends.mps.is_available():
+        return torch.device('mps')
+    else:
+        return torch.device('cpu')
 
 
 @pytest.fixture

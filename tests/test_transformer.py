@@ -103,7 +103,7 @@ class TestPaddingMasks:
 
 
 class TestDeviceCompatibility:
-    """Test device compatibility (CPU/GPU)"""
+    """Test device compatibility (CPU/CUDA/MPS)"""
     
     def test_cpu_inference(self, small_model, sample_sequences):
         """Test inference on CPU"""
@@ -115,9 +115,10 @@ class TestDeviceCompatibility:
         
         assert output.device.type == 'cpu'
     
+    @pytest.mark.gpu
     @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
     def test_gpu_inference(self, small_model, sample_sequences):
-        """Test inference on GPU"""
+        """Test inference on CUDA GPU"""
         device = torch.device('cuda')
         small_model = small_model.to(device)
         source = sample_sequences['source'].to(device)
@@ -127,9 +128,23 @@ class TestDeviceCompatibility:
         
         assert output.device.type == 'cuda'
     
+    @pytest.mark.mps
+    @pytest.mark.skipif(not torch.backends.mps.is_available(), reason="MPS not available")
+    def test_mps_inference(self, small_model, sample_sequences):
+        """Test inference on MPS (Apple Silicon GPU)"""
+        device = torch.device('mps')
+        small_model = small_model.to(device)
+        source = sample_sequences['source'].to(device)
+        target = sample_sequences['target'].to(device)
+        
+        output = small_model(source, target)
+        
+        assert output.device.type == 'mps'
+    
+    @pytest.mark.gpu
     @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
-    def test_mask_device_consistency(self, small_model):
-        """Test that masks are created on the same device as input"""
+    def test_mask_device_consistency_cuda(self, small_model):
+        """Test that masks are created on the same device as input (CUDA)"""
         device = torch.device('cuda')
         small_model = small_model.to(device)
         source = torch.tensor([[1, 2, 3, 0, 0]]).to(device)
@@ -137,7 +152,20 @@ class TestDeviceCompatibility:
         
         # This should not raise any device mismatch errors
         output = small_model(source, target)
-        assert output.device == device
+        assert output.device.type == 'cuda'  # Compare device type instead of exact device
+    
+    @pytest.mark.mps
+    @pytest.mark.skipif(not torch.backends.mps.is_available(), reason="MPS not available")
+    def test_mask_device_consistency_mps(self, small_model):
+        """Test that masks are created on the same device as input (MPS)"""
+        device = torch.device('mps')
+        small_model = small_model.to(device)
+        source = torch.tensor([[1, 2, 3, 0, 0]]).to(device)
+        target = torch.tensor([[4, 5, 0, 0, 0]]).to(device)
+        
+        # This should not raise any device mismatch errors
+        output = small_model(source, target)
+        assert output.device.type == 'mps'  # Compare device type instead of exact device
 
 
 class TestTrainingCompatibility:
