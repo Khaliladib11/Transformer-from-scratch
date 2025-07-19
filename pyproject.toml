@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "transformer-from-scratch"
+version = "0.1.0"
+description = ""
+authors = ["khaliladib11 <73353537+Khaliladib11@users.noreply.github.com>"]
+readme = "README.md"
+packages = [{include = "transformer_from_scratch"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
