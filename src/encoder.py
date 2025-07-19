@@ -4,7 +4,7 @@ from attention import MultiHeadAttention
 from embed import Embedding, PositionalEncoding
 
 
-class TransformerBlock(nn.Module):
+class EncoderBlock(nn.Module):
 
     def __init__(self,
                  embed_dim=512,
@@ -20,9 +20,9 @@ class TransformerBlock(nn.Module):
         :param expansion_factor: the factor that determines the output dimension of the feed forward layer
         :param dropout: probability dropout (between 0 and 1)
         """
-        super(TransformerBlock, self).__init__()
+        super(EncoderBlock, self).__init__()
 
-        self.attention = MultiHeadAttention(embed_dim, heads)  # the multi-head attention
+        self.attention = MultiHeadAttention(embed_dim=embed_dim, heads=heads)  # the multi-head attention
         self.norm = nn.LayerNorm(embed_dim)  # the normalization layer
 
         # the FeedForward layer
@@ -85,19 +85,19 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
 
         # define the embedding: (vocabulary size x embedding dimension)
-        self.embedding = Embedding(vocab_size, embed_dim)
+        self.embedding = Embedding(vocab_size=vocab_size, embed_dim=embed_dim)
 
         # define the positional encoding: (embedding dimension x sequence length)
-        self.positional_encoder = PositionalEncoding(embed_dim, seq_len)
+        self.positional_encoder = PositionalEncoding(embed_dim=embed_dim, max_seq_len=seq_len)
 
         # define the set of blocks
         # so we will have 'num_blocks' stacked on top of each other
-        self.blocks = replicate(TransformerBlock(embed_dim, heads, expansion_factor, dropout), num_blocks)
+        self.blocks = replicate(EncoderBlock(embed_dim=embed_dim, heads=heads, expansion_factor=expansion_factor, dropout=dropout), N=num_blocks)
 
-    def forward(self, x):
+    def forward(self, x, mask=None):
         out = self.positional_encoder(self.embedding(x))
         for block in self.blocks:
-            out = block(out, out, out)
+            out = block(query=out, key=out, value=out, mask=mask)
 
         # output shape: batch_size x seq_len x embed_size, e.g.: 32x10x512
         return out

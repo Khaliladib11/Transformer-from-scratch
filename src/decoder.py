@@ -3,7 +3,6 @@ import torch.nn.functional as F
 from utils import replicate
 from attention import MultiHeadAttention
 from embed import PositionalEncoding
-from encoder import TransformerBlock
 
 
 class DecoderBlock(nn.Module):
@@ -15,7 +14,12 @@ class DecoderBlock(nn.Module):
                  dropout=0.2
                  ):
         """
-        The DecoderBlock which will consist of the TransformerBlock used in the encoder, plus a decoder multi-head attention
+        The DecoderBlock which consists of:
+        1. Masked self-attention
+        2. Cross-attention with encoder outputs
+        3. Feed-forward network
+        Each with residual connections and layer normalization
+        
         :param embed_dim: the embedding dimension
         :param heads: the number of heads
         :param expansion_factor: the factor that determines the output dimension of the feed forward layer
@@ -23,24 +27,62 @@ class DecoderBlock(nn.Module):
         """
         super(DecoderBlock, self).__init__()
 
-        # First define the Decoder Multi-head attention
-        self.attention = MultiHeadAttention(embed_dim, heads)
-        # normalization
-        self.norm = nn.LayerNorm(embed_dim)
-        # Dropout to avoid overfitting
+        # Self-attention for decoder
+        self.self_attention = MultiHeadAttention(embed_dim, heads)
+        self.self_attn_norm = nn.LayerNorm(embed_dim)
+        
+        # Cross-attention with encoder
+        self.cross_attention = MultiHeadAttention(embed_dim, heads)
+        self.cross_attn_norm = nn.LayerNorm(embed_dim)
+        
+        # Feed-forward network
+        self.feed_forward = nn.Sequential(
+            nn.Linear(embed_dim, expansion_factor * embed_dim),
+            nn.ReLU(),
+            nn.Linear(embed_dim * expansion_factor, embed_dim),
+        )
+        self.ff_norm = nn.LayerNorm(embed_dim)
+        
+        # Dropout
         self.dropout = nn.Dropout(dropout)
-        # finally th transformerBlock
-        self.transformerBlock = TransformerBlock(embed_dim, heads, expansion_factor, dropout)
-
-    def forward(self, key, query, x, mask):
-        # pass the inputs to the decoder multi-head attention
-        decoder_attention = self.attention(x, x, x, mask)
-        # residual connection + normalization
-        value = self.dropout(self.norm(decoder_attention + x))
-        # finally the transformerBlock (multi-head attention -> residual + norm -> feed forward -> residual + norm)
-        decoder_attention_output = self.transformerBlock(key, query, value)
-
-        return decoder_attention_output
+    
+    def forward(self, encoder_output, decoder_input, src_mask=None, trg_mask=None):
+        """
+        Forward pass through decoder block
+        
+        Args:
+            encoder_output: output from encoder (batch_size, src_len, embed_dim)
+            decoder_input: input to decoder (batch_size, trg_len, embed_dim)  
+            src_mask: mask for encoder output (batch_size, 1, 1, src_len)
+            trg_mask: causal mask for decoder (batch_size, 1, trg_len, trg_len)
+        """
+        
+        # 1. Masked Self-Attention
+        self_attn_output = self.self_attention(
+            key=decoder_input, 
+            query=decoder_input, 
+            value=decoder_input, 
+            mask=trg_mask
+        )
+        # Residual connection + normalization
+        decoder_input = self.dropout(self.self_attn_norm(self_attn_output + decoder_input))
+        
+        # 2. Cross-Attention with encoder
+        cross_attn_output = self.cross_attention(
+            key=encoder_output,      # From encoder (src_len)
+            query=decoder_input,     # From decoder (trg_len)  
+            value=encoder_output,    # From encoder (src_len)
+            mask=src_mask           # Mask encoder padding
+        )
+        # Residual connection + normalization (query shape = decoder shape)
+        decoder_input = self.dropout(self.cross_attn_norm(cross_attn_output + decoder_input))
+        
+        # 3. Feed-Forward Network
+        ff_output = self.feed_forward(decoder_input)
+        # Residual connection + normalization
+        output = self.dropout(self.ff_norm(ff_output + decoder_input))
+        
+        return output
 
 
 class Decoder(nn.Module):
@@ -78,10 +120,10 @@ class Decoder(nn.Module):
         # dropout for overfitting
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, encoder_output, mask):
+    def forward(self, x, encoder_output, src_mask=None, trg_mask=None):
         x = self.dropout(self.positional_encoder(self.embedding(x)))  # 32x10x512
 
         for block in self.blocks:
-            x = block(encoder_output, x, encoder_output, mask)
+            x = block(encoder_output, x, src_mask, trg_mask)
 
         return x
