@@ -64,7 +64,7 @@ class Transformer(nn.Module):
         device = trg.device
         
         # Create causal mask (lower triangular) directly on the correct device
-        causal_mask = torch.tril(torch.ones((trg_len, trg_len), device=device)).expand(
+        causal_mask = torch.tril(torch.ones((trg_len, trg_len), device=device, dtype=torch.bool)).expand(
             batch_size, 1, trg_len, trg_len
         )
         
