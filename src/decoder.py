@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from utils import replicate
 from attention import MultiHeadAttention
 from embed import PositionalEncoding
-from encoder import TransformerBlock
+from encoder import EncoderBlock
 
 
 class DecoderBlock(nn.Module):
@@ -15,7 +15,7 @@ class DecoderBlock(nn.Module):
                  dropout=0.2
                  ):
         """
-        The DecoderBlock which will consist of the TransformerBlock used in the encoder, plus a decoder multi-head attention
+        The DecoderBlock which will consist of the EncoderBlock used in the encoder, plus a decoder multi-head attention
         :param embed_dim: the embedding dimension
         :param heads: the number of heads
         :param expansion_factor: the factor that determines the output dimension of the feed forward layer
@@ -29,18 +29,18 @@ class DecoderBlock(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         # Dropout to avoid overfitting
         self.dropout = nn.Dropout(dropout)
-        # finally th transformerBlock
-        self.transformerBlock = TransformerBlock(embed_dim, heads, expansion_factor, dropout)
-
-    def forward(self, key, query, x, mask):
-        # pass the inputs to the decoder multi-head attention
-        decoder_attention = self.attention(x, x, x, mask)
+        # finally the encoderBlock (used as cross-attention)
+        self.encoderBlock = EncoderBlock(embed_dim, heads, expansion_factor, dropout)
+    
+    def forward(self, encoder_output, decoder_input, src_mask=None, trg_mask=None):            
+        # pass the inputs to the decoder multi-head attention (self-attention)
+        self_attn_output = self.attention(decoder_input, decoder_input, decoder_input, trg_mask)
         # residual connection + normalization
-        value = self.dropout(self.norm(decoder_attention + x))
-        # finally the transformerBlock (multi-head attention -> residual + norm -> feed forward -> residual + norm)
-        decoder_attention_output = self.transformerBlock(key, query, value)
-
-        return decoder_attention_output
+        self_attn_out = self.dropout(self.norm(self_attn_output + decoder_input))
+        # finally the encoderBlock for cross-attention (query from decoder, key and value from encoder)
+        out = self.encoderBlock(key=encoder_output, query=self_attn_out, value=encoder_output, mask=src_mask)
+        # return the output
+        return out
 
 
 class Decoder(nn.Module):
@@ -78,10 +78,10 @@ class Decoder(nn.Module):
         # dropout for overfitting
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, encoder_output, mask):
+    def forward(self, x, encoder_output, src_mask=None, trg_mask=None):
         x = self.dropout(self.positional_encoder(self.embedding(x)))  # 32x10x512
 
         for block in self.blocks:
-            x = block(encoder_output, x, encoder_output, mask)
+            x = block(encoder_output, x, src_mask, trg_mask)
 
         return x

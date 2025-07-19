@@ -94,10 +94,10 @@ class Encoder(nn.Module):
         # so we will have 'num_blocks' stacked on top of each other
         self.blocks = replicate(EncoderBlock(embed_dim=embed_dim, heads=heads, expansion_factor=expansion_factor, dropout=dropout), N=num_blocks)
 
-    def forward(self, x):
+    def forward(self, x, mask=None):
         out = self.positional_encoder(self.embedding(x))
         for block in self.blocks:
-            out = block(query=out, key=out, value=out)
+            out = block(query=out, key=out, value=out, mask=mask)
 
         # output shape: batch_size x seq_len x embed_size, e.g.: 32x10x512
         return out

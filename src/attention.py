@@ -56,9 +56,9 @@ class MultiHeadAttention(nn.Module):
         product = product / math.sqrt(self.d_k)
         
         if mask is not None:
-            product = product.masked_fill(mask == 0, float("-1e20"))
-
-
+            # mask: True = attend, False = don't attend
+            # We mask positions where mask == False with large negative value
+            product = product.masked_fill(~mask, float("-1e20"))
 
         scores = F.softmax(product, dim=-1)  # (batch_size, heads, q_len, k_len)
 
