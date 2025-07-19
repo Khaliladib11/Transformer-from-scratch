@@ -1,4 +1,4 @@
-from math import sqrt
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,57 +15,59 @@ class MultiHeadAttention(nn.Module):
         super(MultiHeadAttention, self).__init__()
         self.embed_dim = embed_dim  # 512 by default
         self.heads = heads  # 8 heads by default
-        self.head = int(self.embed_dim / self.heads)  # 512 / 8 = 64 by default
-        # note: The embedding dimension must be divided by the number of heads
+        self.d_k = int(self.embed_dim / self.heads)  # 512 / 8 = 64 by default
+        # note: The embedding dimension must be divided by the number of heads, otherwise the model will not work
+        assert embed_dim % heads == 0, f"embed_dim ({embed_dim}) must be divisible by heads ({heads})"
 
-        # query, value, key: (64x64)
-        self.query = nn.Linear(self.head, self.head, bias=False)  # the Query metrix
-        self.value = nn.Linear(self.head, self.head, bias=False)  # the Value metrix
-        self.key = nn.Linear(self.head, self.head, bias=False)  # the Key metrix
+        # query, value, key: (embed_dim x embed_dim)
+        self.w_q = nn.Linear(self.embed_dim, self.embed_dim, bias=False)  # the Query metrix
+        self.w_v = nn.Linear(self.embed_dim, self.embed_dim, bias=False)  # the Value metrix
+        self.w_k = nn.Linear(self.embed_dim, self.embed_dim, bias=False)  # the Key metrix
 
         # fully connected layer: 8*64x512 or 512x512
-        self.fc_out = nn.Linear(self.head * self.heads, embed_dim)
+        self.fc_out = nn.Linear(self.embed_dim, self.embed_dim)
+        
+    def split_heads(self, x):
+        """
+        Split the last dimension of the input tensor into heads
+        :param x: the input tensor: batch_size x seq_len x embed_dim (e.g. 64x1024x512)
+        :return: the tensor with the last dimension split into heads (e.g. 64x1024x8x64)
+        """
+        batch_size, seq_len, embed_dim = x.size()
+        x = x.view(batch_size, seq_len, self.heads, self.d_k)
+        return x.transpose(1, 2)  # (batch_size, seq_len, heads, d_k) to (batch_size, heads, seq_len, d_k), not (batch_size, heads, d_k, seq_len)
 
     def forward(self, key, query, value, mask=None):
-        # Input of size: batch_size x sequence length x embedding dims
         batch_size = key.size(0)
         k_len, q_len, v_len = key.size(1), query.size(1), value.size(1)
+        
+        key = self.w_k(key)       # (batch_size, k_len, embed_dim)
+        query = self.w_q(query)   # (batch_size, q_len, embed_dim)
+        value = self.w_v(value)   # (batch_size, v_len, embed_dim)
 
-        # reshape from (batch_size x seq_len x embed_size) -> (batch_size x seq_len x heads x head)
-        # example: from (32x10x512) -> (32x10x8x64)
-        key = key.reshape(batch_size, k_len, self.heads, self.head)
-        query = query.reshape(batch_size, q_len, self.heads, self.head)
-        value = value.reshape(batch_size, v_len, self.heads, self.head)
+        # Split heads: (batch_size, seq_len, embed_dim) -> (batch_size, heads, seq_len, d_k)
+        key = self.split_heads(key)
+        query = self.split_heads(query)
+        value = self.split_heads(value)
 
-        key = self.key(key)  # (32x10x8x64)
-        query = self.query(query)  # (32x10x8x64)
-        value = self.value(value)  # (32x10x8x64)
-
-        ############### query x key ###############
-
-        # query shape: batch_size x q_len, heads, head, e.g: (32x10x8x64)
-        # key shape: batch_size x v_len, heads, head, e.g: (32x10x8x64)
-        # product shape should be: batch_size, heads, q_len, v_len, e.g: (32x8x10x10)
-        product = torch.einsum("bqhd,bkhd->bhqk", [query, key])
-
-        # if mask (in decoder)
+        # Scaled dot-product attention scores
+        product = torch.einsum("bhqd,bhkd->bhqk", [query, key])  # (batch_size, heads, q_len, k_len)
+        
+        product = product / math.sqrt(self.d_k)
+        
         if mask is not None:
             product = product.masked_fill(mask == 0, float("-1e20"))
 
-        product = product / sqrt(self.head)
 
-        scores = F.softmax(product, dim=-1)
 
-        ############### scores x value ###############
+        scores = F.softmax(product, dim=-1)  # (batch_size, heads, q_len, k_len)
 
-        # scores shape: batch_size, heads, q_len, v_len, e.g: (32x8x10x10)
-        # value shape: batch_size, v_len, heads, head, e.g: (32x10x8x64)
-        # output: batch_size, heads, v_len, head, e.g: (32x10x512)
+        # Attention output
+        output = torch.einsum("bhqk,bhkd->bhqd", [scores, value])  # (batch_size, heads, q_len, d_k)
 
-        output = torch.einsum("nhql,nlhd->nqhd", [scores, value]).reshape(
-            batch_size, q_len, self.heads * self.head
-        )
+        # Concatenate heads
+        output = output.transpose(1, 2).contiguous().view(batch_size, q_len, self.heads * self.d_k)
 
-        output = self.fc_out(output)  # (32x10x512) -> (32x10x512)
+        output = self.fc_out(output)  # (batch_size, q_len, embed_dim)
 
         return output

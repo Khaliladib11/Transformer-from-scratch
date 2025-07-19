@@ -4,7 +4,7 @@ from attention import MultiHeadAttention
 from embed import Embedding, PositionalEncoding
 
 
-class TransformerBlock(nn.Module):
+class EncoderBlock(nn.Module):
 
     def __init__(self,
                  embed_dim=512,
@@ -20,7 +20,7 @@ class TransformerBlock(nn.Module):
         :param expansion_factor: the factor that determines the output dimension of the feed forward layer
         :param dropout: probability dropout (between 0 and 1)
         """
-        super(TransformerBlock, self).__init__()
+        super(EncoderBlock, self).__init__()
 
         self.attention = MultiHeadAttention(embed_dim, heads)  # the multi-head attention
         self.norm = nn.LayerNorm(embed_dim)  # the normalization layer
@@ -92,7 +92,7 @@ class Encoder(nn.Module):
 
         # define the set of blocks
         # so we will have 'num_blocks' stacked on top of each other
-        self.blocks = replicate(TransformerBlock(embed_dim, heads, expansion_factor, dropout), num_blocks)
+        self.blocks = replicate(EncoderBlock(embed_dim, heads, expansion_factor, dropout), num_blocks)
 
     def forward(self, x):
         out = self.positional_encoder(self.embedding(x))
