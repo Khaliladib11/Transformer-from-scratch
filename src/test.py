@@ -5,7 +5,7 @@ Tests basic functionality, padding masks, variable-length sequences, and trainin
 
 import torch
 import torch.nn as nn
-from transformer import Transformer
+from .transformer import Transformer
 
 
 def test_basic_functionality():
