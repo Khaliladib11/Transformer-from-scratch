@@ -1,8 +1,8 @@
 import torch.nn as nn
 import torch.nn.functional as F
-from utils import replicate
-from attention import MultiHeadAttention
-from embed import PositionalEncoding
+from .utils import replicate
+from .attention import MultiHeadAttention
+from .embed import PositionalEncoding
 
 
 class DecoderBlock(nn.Module):

@@ -1,7 +1,7 @@
 import torch.nn as nn
-from utils import replicate
-from attention import MultiHeadAttention
-from embed import Embedding, PositionalEncoding
+from .utils import replicate
+from .attention import MultiHeadAttention
+from .embed import Embedding, PositionalEncoding
 
 
 class EncoderBlock(nn.Module):
